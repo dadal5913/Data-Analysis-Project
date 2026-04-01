@@ -10,8 +10,7 @@ router = APIRouter(prefix="/ml", tags=["ml"])
 
 @router.post("/train", response_model=MLTrainResponse)
 def train(payload: MLTrainRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    _ = current_user
-    return MLService(db).train(payload)
+    return MLService(db).train(current_user.id, payload)
 
 
 @router.post("/predict", response_model=MLPredictionResponse)

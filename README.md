@@ -36,6 +36,14 @@ The compose file lives at `infra/docker-compose.yml` and loads variables from `i
 
 ### 1. Start the stack
 
+**One-shot (bash):** from repo root, run all startup steps (compose up, wait for DB/API, `create_all`, Alembic, seed):
+
+```bash
+bash scripts/docker-up.sh
+```
+
+On Linux/macOS you can `chmod +x scripts/docker-up.sh` and then `./scripts/docker-up.sh`.
+
 Using Make:
 
 ```bash
@@ -98,6 +106,20 @@ docker compose --env-file infra/.env.example -f infra/docker-compose.yml exec ba
 
 ### 5. Stop the stack
 
+**Bash helper (samme `infra/.env` / `.env.example` som `docker-up.sh`):**
+
+```bash
+bash scripts/docker-down.sh
+```
+
+Slett også Postgres-volum (blank database neste gang):
+
+```bash
+bash scripts/docker-down.sh --volumes
+```
+
+Using Make:
+
 ```bash
 make down
 ```
@@ -141,9 +163,19 @@ docker compose --env-file infra/.env.example -f infra/docker-compose.yml up -d
 
 ## Screenshots
 
-- TODO: `docs/screenshots/dashboard-overview.png`
-- TODO: `docs/screenshots/backtest-detail.png`
-- TODO: `docs/screenshots/ml-results.png`
+- `docs/screenshots/dashboard-overview.png` (recommended capture: `/dashboard`)
+- `docs/screenshots/backtest-detail.png` (recommended capture: `/dashboard/backtests/{id}`)
+- `docs/screenshots/ml-results.png` (recommended capture: `/dashboard/ml`)
+
+Current UI now includes:
+- Auth flow (`/login`, `/register`)
+- Dataset upload + listing
+- Backtest run flow with detail charts (equity + drawdown) and trade table
+- ML training view with confusion matrix + feature importance
+- Live WebSocket watchlist on dashboard home
+- Table polish: pagination, search/filter and sorting on key views
+- Stronger client-side form validation and inline field errors
+- Improved backend error parsing (FastAPI `detail` string/array handling)
 
 ## Engineering decisions
 

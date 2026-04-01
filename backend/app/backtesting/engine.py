@@ -18,9 +18,10 @@ class BacktestEngine:
         signals = strategy_cls(params).generate_signals(data).shift(1).fillna(0)
         returns = data["close"].pct_change().fillna(0.0)
         gross_returns = returns * signals * config.get("position_size", 1.0)
-        cost = config.get("transaction_cost_bps", 5.0) / 10000.0
+        transaction_cost = config.get("transaction_cost_bps", 5.0) / 10000.0
+        slippage_cost = config.get("slippage_bps", 0.0) / 10000.0
         trade_events = signals.diff().abs().fillna(0.0)
-        net_returns = gross_returns - trade_events * cost
+        net_returns = gross_returns - trade_events * (transaction_cost + slippage_cost)
         equity = (1 + net_returns).cumprod() * config.get("initial_capital", 10000.0)
 
         trades: list[dict] = []
@@ -35,7 +36,7 @@ class BacktestEngine:
                     }
                 )
 
-        metrics = calculate_metrics(equity, trades)
+        metrics = calculate_metrics(equity, trades, data["date"])
         curve = [
             {"date": str(row.date), "equity": float(val)}
             for row, val in zip(data.itertuples(index=False), equity)

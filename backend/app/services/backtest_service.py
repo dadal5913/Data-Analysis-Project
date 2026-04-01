@@ -19,6 +19,8 @@ class BacktestService:
         dataset = self.dataset_repo.get_by_id(payload.dataset_id)
         if not dataset:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+        if dataset.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden dataset access")
 
         data = self.dataset_repo.load_ohlcv(dataset.file_path)
         result = self.engine.run(
