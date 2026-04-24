@@ -1,7 +1,7 @@
 # QuantLab
 
 QuantLab is a production-style full-stack trading and market analysis platform for portfolio demonstration.  
-It combines a Python backtesting engine, FastAPI services, Next.js analytics dashboard, PostgreSQL persistence, Redis-powered realtime feeds, and a classical ML prediction pipeline.
+It combines a Python backtesting engine, FastAPI services, a Next.js + shadcn/ui analytics dashboard, Neon-managed PostgreSQL persistence, Redis-powered realtime feeds, and a classical ML prediction pipeline.
 
 ## Architecture
 
@@ -12,13 +12,13 @@ graph TB
   Backend --> Services[ServiceLayer]
   Services --> Backtesting[BacktestingEngine]
   Services --> MlModule[MLPipeline]
-  Services --> Pg[(PostgreSQL)]
+  Services -->|TLS sslmode=require| Neon[(Neon Postgres)]
   WsEndpoint --> Redis[(Redis)]
 ```
 
 ## Monorepo
 
-- `frontend/` Next.js + React + TypeScript + Tailwind + Plotly
+- `frontend/` Next.js 14 + React 18 + TypeScript + Tailwind CSS + shadcn/ui (Radix + `lucide-react`) + Plotly
 - `backend/` FastAPI + SQLAlchemy + Alembic + Pandas/NumPy + scikit-learn
 - `infra/` docker-compose, env templates, nginx
 - `docs/` architecture, API, backtesting engine, ML module docs
@@ -26,17 +26,29 @@ graph TB
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose v2)
+- A free [Neon](https://console.neon.tech) project — grab the **pooled** connection string and put it in `infra/.env` as `DATABASE_URL` (the script refuses the placeholder)
 - Optional: GNU `make`, if you want to use the repo `Makefile` targets
 
 All commands below assume the repository root as the working directory.
 
 ## Local setup (Docker Compose)
 
-The compose file lives at `infra/docker-compose.yml` and loads variables from `infra/.env.example` (or copy it to `infra/.env` and point `--env-file` at that file for local secrets).
+The compose file lives at `infra/docker-compose.yml` and runs two containerized services (`redis`, `backend`, `frontend`) that talk to Neon over the public internet. It loads variables from `infra/.env.example`; copy it to `infra/.env` and paste your real `DATABASE_URL` there before the first start.
+
+### 0. Configure Neon
+
+```bash
+cp infra/.env.example infra/.env
+# then open infra/.env and replace the DATABASE_URL placeholder with your Neon
+# pooled connection string, e.g.
+# DATABASE_URL=postgresql+psycopg2://user:pwd@ep-foo.neon.tech/neondb?sslmode=require
+```
+
+See `docs/docker-local-setup.md` for the detailed walkthrough (including auto-suspend behaviour and SSL notes).
 
 ### 1. Start the stack
 
-**One-shot (bash):** from repo root, run all startup steps (compose up, wait for DB/API, `create_all`, Alembic, seed):
+**One-shot (bash):** from repo root, run all startup steps (compose up, wait for API, `create_all` on Neon, Alembic, seed):
 
 ```bash
 bash scripts/docker-up.sh
@@ -53,7 +65,7 @@ make up
 Or explicitly (PowerShell / bash):
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml up -d --build
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 ```
 
 ### 2. Database schema
@@ -61,7 +73,7 @@ docker compose --env-file infra/.env.example -f infra/docker-compose.yml up -d -
 SQLAlchemy creates tables when the API process imports `app.main` (`Base.metadata.create_all`). **Start the backend once** and confirm it is healthy before seeding:
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml logs --tail=50 backend
+docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=50 backend
 ```
 
 **Alembic:** Initial migration revisions may not be committed yet. The `make migrate` target sets `PYTHONPATH=/app` so Alembic can import the `app` package. After you add files under `backend/alembic/versions/`, run:
@@ -73,13 +85,13 @@ make migrate
 Or:
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml exec backend sh -lc "PYTHONPATH=/app alembic upgrade head"
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec backend sh -lc "PYTHONPATH=/app alembic upgrade head"
 ```
 
 If you need to create tables manually (e.g. before the API has started successfully):
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml exec backend python -c "from app.models.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec backend python -c "from app.models.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
 ```
 
 ### 3. Seed demo user
@@ -91,7 +103,7 @@ make seed
 Or:
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml exec backend python -m app.db.seed
+docker compose --env-file infra/.env -f infra/docker-compose.yml exec backend python -m app.db.seed
 ```
 
 ### 4. Open the app
@@ -106,17 +118,13 @@ docker compose --env-file infra/.env.example -f infra/docker-compose.yml exec ba
 
 ### 5. Stop the stack
 
-**Bash helper (samme `infra/.env` / `.env.example` som `docker-up.sh`):**
+**Bash helper (same `infra/.env` resolution as `docker-up.sh`):**
 
 ```bash
 bash scripts/docker-down.sh
 ```
 
-Slett også Postgres-volum (blank database neste gang):
-
-```bash
-bash scripts/docker-down.sh --volumes
-```
+> Your database lives on Neon, so `down` never touches it. To reset data, create a new Neon branch or run `DROP/TRUNCATE` against your current branch.
 
 Using Make:
 
@@ -127,25 +135,28 @@ make down
 Or:
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml down
+docker compose --env-file infra/.env -f infra/docker-compose.yml down
 ```
 
 ### Rebuild after dependency changes
 
-If you change `backend/requirements.txt` or frontend `package.json`, rebuild images:
+If you change `backend/requirements.txt` or frontend `package.json` (e.g. adding a new shadcn/ui primitive), rebuild images:
 
 ```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml build --no-cache backend frontend
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml up -d
+docker compose --env-file infra/.env -f infra/docker-compose.yml build --no-cache backend frontend
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
 ```
 
 ## Troubleshooting
 
 | Symptom | Likely cause | What to try |
 |--------|----------------|-------------|
+| `ERROR: DATABASE_URL ... is still the Neon placeholder` | You did not replace the template URL | Open `infra/.env`, paste your real Neon pooled URL (with `?sslmode=require`), and re-run the start script. |
+| `could not translate host name` / `SSL connection has been closed` | Missing `sslmode=require` or wrong scheme | Confirm the URL starts with `postgresql+psycopg2://` and ends with `?sslmode=require`. |
 | `localhost:3000` is blank or refuses connection | Frontend container crashed | `docker compose ... logs frontend` — Next.js expects `frontend/next.config.mjs` (not `next.config.ts` in this Node image). |
 | `ModuleNotFoundError: No module named 'app'` when running Alembic | Python path inside container | Use `make migrate` or prefix with `PYTHONPATH=/app` (already wired in the Makefile). |
-| `relation "users" does not exist` when running seed | Tables not created yet | Start backend successfully or run the `create_all` one-liner in section 2. |
+| `relation "users" does not exist` when running seed | Tables not created yet on Neon | Start backend successfully or run the `create_all` one-liner in section 2. |
+| First API request after idle is slow (~1–3s) | Neon compute auto-suspend | Expected on free tier; `pool_pre_ping` handles stale connections transparently. |
 | `email-validator is not installed` | Missing optional Pydantic email dependency | Rebuild backend after pulling `email-validator` in `requirements.txt`. |
 | bcrypt / passlib errors during seed | `bcrypt` too new for `passlib` | `backend/requirements.txt` pins `bcrypt==4.0.1`; rebuild the backend image. |
 
@@ -176,6 +187,7 @@ Current UI now includes:
 - Table polish: pagination, search/filter and sorting on key views
 - Stronger client-side form validation and inline field errors
 - Improved backend error parsing (FastAPI `detail` string/array handling)
+- Built on [shadcn/ui](https://ui.shadcn.com/) primitives (Radix + Tailwind CSS variables) with `lucide-react` icons
 
 ## Engineering decisions
 

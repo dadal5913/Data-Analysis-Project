@@ -4,10 +4,24 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Field } from "@/components/ui/field";
+import {
+  IconLineChart,
+  IconPlay
+} from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSearch } from "@/components/ui/table-search";
 import { apiFetch } from "@/lib/api-client";
@@ -46,10 +60,7 @@ export default function BacktestsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const currentParamEntries = useMemo(
-    () => Object.entries(params),
-    [params]
-  );
+  const currentParamEntries = useMemo(() => Object.entries(params), [params]);
 
   const loadData = async () => {
     setError(null);
@@ -160,124 +171,225 @@ export default function BacktestsPage() {
   }, [search, strategyFilter, datasetFilter, dateFrom, dateTo, sortBy, pageSize]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Backtests</h1>
+    <>
+      <PageHeader
+        eyebrow="Research"
+        title="Backtests"
+        description="Configure a strategy, run a simulation, and review performance metrics."
+      />
 
-      <form className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-3" onSubmit={onSubmit}>
-        <select
-          className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-          onChange={(e) => setDatasetId(Number(e.target.value))}
-          value={datasetId ?? ""}
-        >
-          {datasets.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name} ({d.symbol})
-            </option>
+      <Card>
+        <CardHeader
+          title="Run a new backtest"
+          description="Pick a dataset and strategy, then tune execution parameters."
+        />
+        <form className="grid gap-3 lg:grid-cols-3" onSubmit={onSubmit}>
+          <Field label="Dataset">
+            <Select
+              onValueChange={(value) => {
+                // Radix Select briefly emits "" while items are being registered; ignore it.
+                if (!value) return;
+                setDatasetId(Number(value));
+              }}
+              value={datasetId ? String(datasetId) : ""}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a dataset" />
+              </SelectTrigger>
+              <SelectContent>
+                {datasets.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.name} ({d.symbol})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Strategy">
+            <Select
+              onValueChange={(value) => {
+                if (!value) return;
+                onStrategyChange(value);
+              }}
+              value={strategyName}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                {strategies.map((s) => (
+                  <SelectItem key={s.name} value={s.name}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {currentParamEntries.map(([key, value]) => (
+            <Field key={key} label={key.replace(/_/g, " ")} error={fieldErrors[key]}>
+              <Input
+                invalid={!!fieldErrors[key]}
+                onChange={(e) => setParams((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                placeholder={key}
+                value={String(value)}
+              />
+            </Field>
           ))}
-        </select>
 
-        <select
-          className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-          onChange={(e) => onStrategyChange(e.target.value)}
-          value={strategyName}
-        >
-          {strategies.map((s) => (
-            <option key={s.name} value={s.name}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+          <Field label="Initial capital" error={fieldErrors.initial_capital}>
+            <Input
+              invalid={!!fieldErrors.initial_capital}
+              onChange={(e) => setInitialCapital(Number(e.target.value))}
+              placeholder="Initial Capital"
+              type="number"
+              value={String(initialCapital)}
+            />
+          </Field>
+          <Field label="Transaction cost (bps)" error={fieldErrors.transaction_cost_bps}>
+            <Input
+              invalid={!!fieldErrors.transaction_cost_bps}
+              onChange={(e) => setTransactionCostBps(Number(e.target.value))}
+              placeholder="Transaction Cost (bps)"
+              type="number"
+              value={String(transactionCostBps)}
+            />
+          </Field>
+          <Field label="Slippage (bps)" error={fieldErrors.slippage_bps}>
+            <Input
+              invalid={!!fieldErrors.slippage_bps}
+              onChange={(e) => setSlippageBps(Number(e.target.value))}
+              placeholder="Slippage (bps)"
+              type="number"
+              value={String(slippageBps)}
+            />
+          </Field>
+          <Field label="Position size (0 to 1)" error={fieldErrors.position_size}>
+            <Input
+              invalid={!!fieldErrors.position_size}
+              onChange={(e) => setPositionSize(Number(e.target.value))}
+              placeholder="Position Size (0-1)"
+              step="0.1"
+              type="number"
+              value={String(positionSize)}
+            />
+          </Field>
 
-        {currentParamEntries.map(([key, value]) => (
-          <Input
-            key={key}
-            onChange={(e) => setParams((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
-            placeholder={key}
-            value={String(value)}
-          />
-        ))}
-        <Input onChange={(e) => setInitialCapital(Number(e.target.value))} placeholder="Initial Capital" type="number" value={String(initialCapital)} />
-        <Input onChange={(e) => setTransactionCostBps(Number(e.target.value))} placeholder="Transaction Cost (bps)" type="number" value={String(transactionCostBps)} />
-        <Input onChange={(e) => setSlippageBps(Number(e.target.value))} placeholder="Slippage (bps)" type="number" value={String(slippageBps)} />
-        <Input onChange={(e) => setPositionSize(Number(e.target.value))} placeholder="Position Size (0-1)" step="0.1" type="number" value={String(positionSize)} />
-
-        <Button disabled={isSubmitting || !datasetId} type="submit">
-          {isSubmitting ? "Running..." : "Run Backtest"}
-        </Button>
-        {Object.keys(fieldErrors).length > 0 ? (
-          <ErrorBanner messages={Object.values(fieldErrors)} />
-        ) : null}
-      </form>
+          <div className="lg:col-span-3">
+            <Button
+              disabled={isSubmitting || !datasetId}
+              leftIcon={<IconPlay size={14} />}
+              type="submit"
+            >
+              {isSubmitting ? "Running..." : "Run Backtest"}
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       {error ? <ErrorBanner message={error} messages={errorMessages} /> : null}
       {isLoading ? <LoadingSpinner label="Loading backtests..." /> : null}
       {!isLoading && backtests.length === 0 ? (
-        <EmptyState title="No backtests yet" description="Run your first strategy simulation above." />
+        <EmptyState
+          icon={<IconLineChart size={16} />}
+          title="No backtests yet"
+          description="Run your first strategy simulation above."
+        />
       ) : null}
 
       {backtests.length > 0 ? (
-        <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-6">
+        <Card padded={false}>
+          <div className="flex flex-col gap-3 border-b border-border/60 p-4 lg:grid lg:grid-cols-6">
             <TableSearch onChange={setSearch} placeholder="Search by id/strategy/dataset..." value={search} />
-            <select
-              className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-              onChange={(e) => setStrategyFilter(e.target.value)}
+            <Select
+              onValueChange={setStrategyFilter}
               value={strategyFilter}
             >
-              <option value="all">All strategies</option>
-              {[...new Set(backtests.map((b) => b.strategy_name))].map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <select
-              className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-              onChange={(e) => setDatasetFilter(e.target.value)}
+              <SelectTrigger>
+                <SelectValue placeholder="All strategies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All strategies</SelectItem>
+                {[...new Set(backtests.map((b) => b.strategy_name))].map(
+                  (s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  )
+                )}
+              </SelectContent>
+            </Select>
+            <Select
+              onValueChange={setDatasetFilter}
               value={datasetFilter}
             >
-              <option value="all">All datasets</option>
-              {[...new Set(backtests.map((b) => b.dataset_id))].map((id) => (
-                <option key={id} value={String(id)}>
-                  Dataset #{id}
-                </option>
-              ))}
-            </select>
-            <select
-              className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-              onChange={(e) => setSortBy(e.target.value as "created" | "return" | "sharpe")}
+              <SelectTrigger>
+                <SelectValue placeholder="All datasets" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All datasets</SelectItem>
+                {[...new Set(backtests.map((b) => b.dataset_id))].map((id) => (
+                  <SelectItem key={id} value={String(id)}>
+                    Dataset #{id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              onValueChange={(value) =>
+                setSortBy(value as "created" | "return" | "sharpe")
+              }
               value={sortBy}
             >
-              <option value="created">Sort: newest</option>
-              <option value="return">Sort: total return</option>
-              <option value="sharpe">Sort: sharpe</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created">Sort: newest</SelectItem>
+                <SelectItem value="return">Sort: total return</SelectItem>
+                <SelectItem value="sharpe">Sort: sharpe</SelectItem>
+              </SelectContent>
+            </Select>
             <Input onChange={(e) => setDateFrom(e.target.value)} type="date" value={dateFrom} />
             <Input onChange={(e) => setDateTo(e.target.value)} type="date" value={dateTo} />
           </div>
-          <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-surface">
-              <tr>
-                <th className="px-3 py-2">ID</th>
-                <th className="px-3 py-2">Strategy</th>
-                <th className="px-3 py-2">Dataset</th>
-                <th className="px-3 py-2">Total Return</th>
-                <th className="px-3 py-2">Sharpe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((b) => (
-                <tr className="cursor-pointer border-t border-border hover:bg-surface" key={b.id} onClick={() => router.push(`/dashboard/backtests/${b.id}`)}>
-                  <td className="px-3 py-2">#{b.id}</td>
-                  <td className="px-3 py-2">{b.strategy_name}</td>
-                  <td className="px-3 py-2">{b.dataset_id}</td>
-                  <td className="px-3 py-2">{((b.metrics.total_return || 0) * 100).toFixed(2)}%</td>
-                  <td className="px-3 py-2">{(b.metrics.sharpe_ratio || 0).toFixed(2)}</td>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border/60 text-2xs uppercase tracking-wider text-foreground-subtle">
+                  <th className="px-4 py-2.5 font-medium">ID</th>
+                  <th className="px-4 py-2.5 font-medium">Strategy</th>
+                  <th className="px-4 py-2.5 font-medium">Dataset</th>
+                  <th className="px-4 py-2.5 font-medium">Total Return</th>
+                  <th className="px-4 py-2.5 font-medium">Sharpe</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {paged.map((b) => {
+                  const r = b.metrics.total_return || 0;
+                  const sh = b.metrics.sharpe_ratio || 0;
+                  return (
+                    <tr
+                      className="cursor-pointer transition-colors hover:bg-surface-hover"
+                      key={b.id}
+                      onClick={() => router.push(`/dashboard/backtests/${b.id}`)}
+                    >
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-muted">#{b.id}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">{b.strategy_name}</td>
+                      <td className="px-4 py-3 text-foreground-muted">#{b.dataset_id}</td>
+                      <td className={`px-4 py-3 font-mono tabular-nums ${r >= 0 ? "text-success" : "text-danger"}`}>
+                        {r >= 0 ? "+" : ""}
+                        {(r * 100).toFixed(2)}%
+                      </td>
+                      <td className="px-4 py-3 font-mono tabular-nums text-foreground">
+                        {sh.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           <TablePagination
             onPageChange={setPage}
@@ -286,8 +398,8 @@ export default function BacktestsPage() {
             pageSize={pageSize}
             total={filtered.length}
           />
-        </div>
+        </Card>
       ) : null}
-    </div>
+    </>
   );
 }

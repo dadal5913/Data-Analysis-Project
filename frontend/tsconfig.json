@@ -23,6 +23,10 @@
     },
     "incremental": true,
     "esModuleInterop": true,
+    "types": [
+      "vitest/globals",
+      "@testing-library/jest-dom"
+    ],
     "plugins": [
       {
         "name": "next"

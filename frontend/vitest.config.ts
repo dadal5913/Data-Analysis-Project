@@ -17,6 +17,7 @@ export default defineConfig({
       "@": srcAliasPath
     },
     environment: "jsdom",
-    globals: true
+    globals: true,
+    setupFiles: ["./tests/setup.ts"]
   }
 });

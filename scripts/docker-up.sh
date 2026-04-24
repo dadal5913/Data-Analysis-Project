@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# QuantLab – bygg og start Docker-stacken, sikre DB-schema, migrering (valgfritt), seed.
+# QuantLab — build and start the Docker stack, ensure DB schema (Neon),
+# run Alembic (if revisions exist), and seed the demo user.
 #
-# Kjør fra hvor som helst:
+# Run from anywhere:
 #   bash scripts/docker-up.sh
-# Fra repo-root etter chmod +x:
+# From repo root after chmod +x:
 #   ./scripts/docker-up.sh
 #
-# Krever: Docker Desktop med `docker compose` v2.
+# Requires:
+#   - Docker Desktop with `docker compose` v2
+#   - A Neon project: set DATABASE_URL in infra/.env (preferred) or infra/.env.example
 
 set -euo pipefail
 
@@ -18,22 +21,24 @@ if [[ -f infra/.env ]]; then
   ENV_FILE="infra/.env"
   echo "Using env file: infra/.env"
 else
-  echo "Using env file: infra/.env.example (kopier til infra/.env for egne secrets)"
+  echo "Using env file: infra/.env.example"
+  echo "  -> Copy it to infra/.env and set DATABASE_URL to your Neon connection string."
+fi
+
+# Guard against the placeholder URL.
+if grep -qE '^DATABASE_URL=.*USER:PASSWORD@HOST\.neon\.tech' "$ENV_FILE"; then
+  echo
+  echo "ERROR: DATABASE_URL in $ENV_FILE is still the Neon placeholder."
+  echo "Open https://console.neon.tech, copy the pooled connection string, and paste it"
+  echo "into $ENV_FILE as DATABASE_URL (remember the 'postgresql+psycopg2://' scheme and"
+  echo "the '?sslmode=require' suffix)."
+  exit 1
 fi
 
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f infra/docker-compose.yml)
 
 echo "==> Building and starting containers..."
 "${COMPOSE[@]}" up -d --build
-
-echo "==> Waiting for PostgreSQL (matches infra/.env.example defaults: user/db quantlab)..."
-for _ in {1..60}; do
-  if "${COMPOSE[@]}" exec -T postgres pg_isready -U quantlab -d quantlab 2>/dev/null; then
-    echo "PostgreSQL is ready."
-    break
-  fi
-  sleep 1
-done
 
 echo "==> Waiting for backend container to accept exec..."
 for _ in {1..90}; do
@@ -56,26 +61,26 @@ for _ in {1..45}; do
   sleep 2
 done
 
-echo "==> Ensuring database tables (SQLAlchemy create_all, idempotent)..."
+echo "==> Ensuring database tables on Neon (SQLAlchemy create_all, idempotent)..."
 "${COMPOSE[@]}" exec -T backend python -c \
   "from app.models.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
 
-echo "==> Alembic upgrade head (OK å fatle tomme versions-mappe)..."
+echo "==> Alembic upgrade head (OK to skip if versions/ is empty)..."
 set +e
 "${COMPOSE[@]}" exec -T backend sh -lc "PYTHONPATH=/app alembic upgrade head"
 ALEMBIC_EXIT=$?
 set -e
 if [[ $ALEMBIC_EXIT -ne 0 ]]; then
-  echo "Note: Alembic exit $ALEMBIC_EXIT — ofte forventet før første revision er lagt i backend/alembic/versions/."
+  echo "Note: Alembic exit $ALEMBIC_EXIT — often expected before the first revision is committed in backend/alembic/versions/."
 fi
 
 echo "==> Seeding demo user..."
 "${COMPOSE[@]}" exec -T backend python -m app.db.seed
 
 echo ""
-echo "Ferdig."
+echo "Done."
 echo "  Frontend:  http://localhost:3000"
 echo "  API docs:  http://localhost:8000/docs"
 echo "  Demo:      demo@quantlab.dev / demo1234"
 echo ""
-echo "Stopp:  docker compose --env-file $ENV_FILE -f infra/docker-compose.yml down"
+echo "Stop:  docker compose --env-file $ENV_FILE -f infra/docker-compose.yml down"

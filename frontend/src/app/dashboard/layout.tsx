@@ -1,23 +1,22 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 
 import { AuthGuard } from "@/components/layout/auth-guard";
+import { Sidebar } from "@/components/layout/sidebar";
+import { Topbar } from "@/components/layout/topbar";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard>
-      <div className="grid min-h-screen grid-cols-[220px_1fr]">
-        <aside className="border-r border-border bg-surface p-4">
-          <p className="mb-4 text-xl font-bold">QuantLab</p>
-          <nav className="space-y-2 text-sm">
-            <Link className="block" href="/dashboard">Dashboard</Link>
-            <Link className="block" href="/dashboard/datasets">Datasets</Link>
-            <Link className="block" href="/dashboard/backtests">Backtests</Link>
-            <Link className="block" href="/dashboard/strategies">Strategies</Link>
-            <Link className="block" href="/dashboard/ml">ML</Link>
-          </nav>
-        </aside>
-        <main className="p-6">{children}</main>
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <div className="flex min-h-screen flex-1 flex-col">
+          <Topbar />
+          <main className="flex-1 px-6 py-8">
+            <div className="mx-auto max-w-[1400px] space-y-8 animate-fade-in">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
     </AuthGuard>
   );

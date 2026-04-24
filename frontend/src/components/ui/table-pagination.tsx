@@ -1,3 +1,14 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+
 interface Props {
   page: number;
   pageSize: number;
@@ -6,31 +17,57 @@ interface Props {
   onPageSizeChange?: (size: number) => void;
 }
 
-export function TablePagination({ page, pageSize, total, onPageChange, onPageSizeChange }: Props) {
+export function TablePagination({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange
+}: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="mt-3 flex items-center justify-between text-sm">
-      <p className="text-gray-400">
-        Page {page} of {totalPages} ({total} rows)
+    <div className="flex items-center justify-between border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+      <p className="tabular-nums">
+        Page <span className="text-foreground">{page}</span> of{" "}
+        <span className="text-foreground">{totalPages}</span> &middot;{" "}
+        <span className="text-foreground">{total}</span> rows
       </p>
       <div className="flex items-center gap-2">
         {onPageSizeChange ? (
-          <select
-            className="rounded border border-border bg-[#0b1020] px-2 py-1"
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            value={pageSize}
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => onPageSizeChange(Number(value))}
           >
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-          </select>
+            <SelectTrigger className="h-8 w-auto gap-2 px-2.5 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5 / page</SelectItem>
+              <SelectItem value="10">10 / page</SelectItem>
+              <SelectItem value="20">20 / page</SelectItem>
+            </SelectContent>
+          </Select>
         ) : null}
-        <button className="rounded border border-border px-2 py-1 disabled:opacity-50" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-          Prev
-        </button>
-        <button className="rounded border border-border px-2 py-1 disabled:opacity-50" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-          Next
-        </button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          className="h-8 gap-1 px-2"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Prev</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+          className="h-8 gap-1 px-2"
+        >
+          <span className="hidden sm:inline">Next</span>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </div>
   );

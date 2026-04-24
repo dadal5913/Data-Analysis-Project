@@ -39,10 +39,11 @@ describe("BacktestsPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<BacktestsPage />);
 
-    await waitFor(() => expect(screen.getByText("Run Backtest")).toBeTruthy());
+    const runButton = await screen.findByRole("button", { name: /Run Backtest/i });
+    await waitFor(() => expect(runButton).not.toBeDisabled());
     expect(screen.getByText("Next")).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText("Search by id/strategy/dataset..."), { target: { value: "buy" } });
-    fireEvent.click(screen.getByText("Run Backtest"));
+    fireEvent.click(runButton);
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard/backtests/42"));
   });

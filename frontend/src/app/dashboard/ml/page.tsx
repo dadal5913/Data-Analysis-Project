@@ -6,9 +6,21 @@ import { ConfusionMatrix } from "@/components/charts/confusion-matrix";
 import { FeatureImportance } from "@/components/charts/feature-importance";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Field } from "@/components/ui/field";
+import { IconPlay, IconSparkles } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { apiFetch } from "@/lib/api-client";
 import type { AppError, Dataset, MLTrainResponse } from "@/types";
 
@@ -75,74 +87,139 @@ export default function MlPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">ML Module</h1>
+    <>
+      <PageHeader
+        eyebrow="Predictions"
+        title="ML Studio"
+        description="Train a classical classifier on an OHLCV dataset and review its diagnostics."
+      />
+
       {error ? <ErrorBanner message={error} messages={errorMessages} /> : null}
 
-      <form className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-4" noValidate onSubmit={onTrain}>
-        <select
-          className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-          onChange={(e) => setDatasetId(Number(e.target.value))}
-          value={datasetId ?? ""}
-        >
-          {datasets.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name} ({d.symbol})
-            </option>
-          ))}
-        </select>
-        {fieldErrors.dataset_id ? <p className="text-xs text-red-300">{fieldErrors.dataset_id}</p> : null}
-        <select
-          className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-          onChange={(e) => setModelType(e.target.value)}
-          value={modelType}
-        >
-          <option value="random_forest">random_forest</option>
-          <option value="gradient_boosting">gradient_boosting</option>
-          <option value="logistic_regression">logistic_regression</option>
-        </select>
-        <input
-          className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-          max={0.5}
-          min={0.1}
-          onChange={(e) => {
-            const nextValue = Number(e.target.value);
-            setTestSize(nextValue);
-          }}
-          step={0.05}
-          type="number"
-          value={testSize}
+      <Card>
+        <CardHeader
+          title="Train a model"
+          description="Directional classifier: predict the sign of the next return."
         />
-        {fieldErrors.test_size ? <p className="text-xs text-red-300">{fieldErrors.test_size}</p> : null}
-        <Button disabled={!datasetId || isSubmitting} type="submit">
-          {isSubmitting ? "Training..." : "Train Model"}
-        </Button>
-      </form>
+        <form className="grid gap-3 md:grid-cols-4" noValidate onSubmit={onTrain}>
+          <Field label="Dataset" error={fieldErrors.dataset_id}>
+            <Select
+              onValueChange={(value) => {
+                // Radix Select briefly emits "" while items are being registered; ignore it.
+                if (!value) return;
+                setDatasetId(Number(value));
+              }}
+              value={datasetId ? String(datasetId) : ""}
+            >
+              <SelectTrigger invalid={!!fieldErrors.dataset_id}>
+                <SelectValue placeholder="Choose a dataset" />
+              </SelectTrigger>
+              <SelectContent>
+                {datasets.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.name} ({d.symbol})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Model">
+            <Select onValueChange={setModelType} value={modelType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="random_forest">random_forest</SelectItem>
+                <SelectItem value="gradient_boosting">
+                  gradient_boosting
+                </SelectItem>
+                <SelectItem value="logistic_regression">
+                  logistic_regression
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field
+            label="Test size"
+            hint="Between 0.1 and 0.5"
+            error={fieldErrors.test_size}
+          >
+            <Input
+              invalid={!!fieldErrors.test_size}
+              max={0.5}
+              min={0.1}
+              onChange={(e) => setTestSize(Number(e.target.value))}
+              step={0.05}
+              type="number"
+              value={testSize}
+            />
+          </Field>
+          <div className="flex items-end">
+            <Button
+              className="w-full"
+              disabled={!datasetId || isSubmitting}
+              leftIcon={<IconPlay size={14} />}
+              type="submit"
+            >
+              {isSubmitting ? "Training..." : "Train Model"}
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       {isLoading ? <LoadingSpinner label="Loading ML page..." /> : null}
       {!isLoading && datasets.length === 0 ? (
-        <EmptyState title="No datasets available" description="Upload a dataset before running ML training." />
+        <EmptyState
+          icon={<IconSparkles size={16} />}
+          title="No datasets available"
+          description="Upload a dataset before running ML training."
+        />
       ) : null}
+
       {result ? (
         <>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <KpiCard label="Accuracy" value={((result.metrics.accuracy || 0) * 100).toFixed(2) + "%"} />
-            <KpiCard label="Precision" value={((result.metrics.precision || 0) * 100).toFixed(2) + "%"} />
-            <KpiCard label="Recall" value={((result.metrics.recall || 0) * 100).toFixed(2) + "%"} />
-            <KpiCard label="F1" value={((result.metrics.f1 || 0) * 100).toFixed(2) + "%"} />
+            <KpiCard
+              label="Accuracy"
+              value={((result.metrics.accuracy || 0) * 100).toFixed(2) + "%"}
+              tone="accent"
+            />
+            <KpiCard
+              label="Precision"
+              value={((result.metrics.precision || 0) * 100).toFixed(2) + "%"}
+              tone="success"
+            />
+            <KpiCard
+              label="Recall"
+              value={((result.metrics.recall || 0) * 100).toFixed(2) + "%"}
+              tone="success"
+            />
+            <KpiCard
+              label="F1"
+              value={((result.metrics.f1 || 0) * 100).toFixed(2) + "%"}
+              tone="accent"
+            />
           </div>
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <h2 className="mb-3 text-lg font-medium">Confusion Matrix</h2>
+
+          <Card>
+            <CardHeader
+              title="Confusion Matrix"
+              description="Predicted vs actual class breakdown on the test split."
+            />
             <ConfusionMatrix z={result.confusion_matrix} />
-          </div>
+          </Card>
+
           {result.feature_importance ? (
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <h2 className="mb-3 text-lg font-medium">Feature Importance</h2>
+            <Card>
+              <CardHeader
+                title="Feature Importance"
+                description="Relative contribution of engineered features."
+              />
               <FeatureImportance data={result.feature_importance} />
-            </div>
+            </Card>
           ) : null}
         </>
       ) : null}
-    </div>
+    </>
   );
 }

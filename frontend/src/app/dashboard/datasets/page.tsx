@@ -3,10 +3,25 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Field } from "@/components/ui/field";
+import {
+  IconDatabase,
+  IconFile,
+  IconUpload
+} from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSearch } from "@/components/ui/table-search";
 import { apiFetch } from "@/lib/api-client";
@@ -57,7 +72,7 @@ export default function DatasetsPage() {
     if (!file) localErrors.file = "CSV file is required";
     if (file && !file.name.toLowerCase().endsWith(".csv")) localErrors.file = "Only .csv files are supported";
     setFieldErrors(localErrors);
-    if (Object.keys(localErrors).length > 0) return;
+    if (Object.keys(localErrors).length > 0 || !file) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -105,79 +120,154 @@ export default function DatasetsPage() {
   }, [search, timeframeFilter, sortBy, pageSize]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Datasets</h1>
+    <>
+      <PageHeader
+        eyebrow="Data"
+        title="Datasets"
+        description="Upload OHLCV CSV files that feed backtests and ML training."
+      />
 
-      <form className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-5" onSubmit={onUpload}>
-        <Input onChange={(e) => setName(e.target.value)} placeholder="Name" value={name} />
-        {fieldErrors.name ? <p className="text-xs text-red-300">{fieldErrors.name}</p> : null}
-        <Input onChange={(e) => setSymbol(e.target.value)} placeholder="Symbol" value={symbol} />
-        {fieldErrors.symbol ? <p className="text-xs text-red-300">{fieldErrors.symbol}</p> : null}
-        <Input onChange={(e) => setTimeframe(e.target.value)} placeholder="Timeframe" value={timeframe} />
-        {fieldErrors.timeframe ? <p className="text-xs text-red-300">{fieldErrors.timeframe}</p> : null}
-        <Input onChange={(e) => setFile(e.target.files?.[0] || null)} type="file" />
-        {fieldErrors.file ? <p className="text-xs text-red-300">{fieldErrors.file}</p> : null}
-        <Button disabled={isSubmitting || !file} type="submit">
-          {isSubmitting ? "Uploading..." : "Upload CSV"}
-        </Button>
-      </form>
+      <Card>
+        <CardHeader
+          title="Upload dataset"
+          description="CSV with date + OHLCV columns. Max 100 MB."
+        />
+        <form
+          className="grid gap-3 md:grid-cols-2 lg:grid-cols-5"
+          onSubmit={onUpload}
+        >
+          <Field label="Name" error={fieldErrors.name}>
+            <Input
+              invalid={!!fieldErrors.name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name"
+              value={name}
+            />
+          </Field>
+          <Field label="Symbol" error={fieldErrors.symbol}>
+            <Input
+              invalid={!!fieldErrors.symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+              placeholder="Symbol"
+              value={symbol}
+            />
+          </Field>
+          <Field label="Timeframe" error={fieldErrors.timeframe}>
+            <Input
+              invalid={!!fieldErrors.timeframe}
+              onChange={(e) => setTimeframe(e.target.value)}
+              placeholder="Timeframe"
+              value={timeframe}
+            />
+          </Field>
+          <Field label="CSV file" error={fieldErrors.file} className="lg:col-span-2">
+            <label
+              className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border border-dashed bg-surface/40 px-3 text-xs transition-colors hover:border-border-strong ${fieldErrors.file ? "border-danger/60 text-danger" : "border-border text-foreground-muted"}`}
+            >
+              <IconFile size={14} />
+              <span className="truncate">
+                {file ? file.name : "Click to select a CSV file"}
+              </span>
+              <input
+                accept=".csv"
+                className="sr-only"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                type="file"
+              />
+            </label>
+          </Field>
+
+          <div className="md:col-span-2 lg:col-span-5">
+            <Button
+              disabled={isSubmitting || !file}
+              leftIcon={<IconUpload size={14} />}
+              type="submit"
+            >
+              {isSubmitting ? "Uploading..." : "Upload CSV"}
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       {error ? <ErrorBanner message={error} messages={errorMessages} /> : null}
       {isLoading ? <LoadingSpinner label="Loading datasets..." /> : null}
       {!isLoading && datasets.length === 0 ? (
-        <EmptyState title="No datasets yet" description="Upload your first OHLCV CSV to get started." />
+        <EmptyState
+          icon={<IconDatabase size={16} />}
+          title="No datasets yet"
+          description="Upload your first OHLCV CSV to get started."
+        />
       ) : null}
 
       {datasets.length > 0 ? (
-        <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-4">
-            <TableSearch onChange={setSearch} placeholder="Search name or symbol..." value={search} />
-            <select
-              className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-              onChange={(e) => setTimeframeFilter(e.target.value)}
-              value={timeframeFilter}
-            >
-              <option value="all">All timeframes</option>
-              {[...new Set(datasets.map((d) => d.timeframe))].map((tf) => (
-                <option key={tf} value={tf}>
-                  {tf}
-                </option>
-              ))}
-            </select>
-            <select
-              className="rounded border border-border bg-[#0b1020] px-3 py-2 text-sm"
-              onChange={(e) => setSortBy(e.target.value as "created" | "rows")}
-              value={sortBy}
-            >
-              <option value="created">Sort: newest</option>
-              <option value="rows">Sort: rows desc</option>
-            </select>
+        <Card padded={false}>
+          <div className="flex flex-col gap-3 border-b border-border/60 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-sm flex-1">
+              <TableSearch onChange={setSearch} placeholder="Search name or symbol..." value={search} />
+            </div>
+            <div className="grid grid-cols-2 gap-2 md:flex md:w-auto">
+              <Select
+                onValueChange={setTimeframeFilter}
+                value={timeframeFilter}
+              >
+                <SelectTrigger className="md:w-[180px]">
+                  <SelectValue placeholder="All timeframes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All timeframes</SelectItem>
+                  {[...new Set(datasets.map((d) => d.timeframe))].map((tf) => (
+                    <SelectItem key={tf} value={tf}>
+                      {tf}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                onValueChange={(value) =>
+                  setSortBy(value as "created" | "rows")
+                }
+                value={sortBy}
+              >
+                <SelectTrigger className="md:w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created">Sort: newest</SelectItem>
+                  <SelectItem value="rows">Sort: rows desc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-surface">
-              <tr>
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Symbol</th>
-                <th className="px-3 py-2">Timeframe</th>
-                <th className="px-3 py-2">Rows</th>
-                <th className="px-3 py-2">Range</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((d) => (
-                <tr className="border-t border-border" key={d.id}>
-                  <td className="px-3 py-2">{d.name}</td>
-                  <td className="px-3 py-2">{d.symbol}</td>
-                  <td className="px-3 py-2">{d.timeframe}</td>
-                  <td className="px-3 py-2">{d.row_count}</td>
-                  <td className="px-3 py-2">
-                    {d.start_date} - {d.end_date}
-                  </td>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border/60 text-2xs uppercase tracking-wider text-foreground-subtle">
+                  <th className="px-4 py-2.5 font-medium">Name</th>
+                  <th className="px-4 py-2.5 font-medium">Symbol</th>
+                  <th className="px-4 py-2.5 font-medium">Timeframe</th>
+                  <th className="px-4 py-2.5 font-medium">Rows</th>
+                  <th className="px-4 py-2.5 font-medium">Range</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {pageRows.map((d) => (
+                  <tr className="transition-colors hover:bg-surface-hover" key={d.id}>
+                    <td className="px-4 py-3 font-medium text-foreground">{d.name}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs text-foreground-muted">{d.symbol}</span>
+                    </td>
+                    <td className="px-4 py-3 text-foreground-muted">{d.timeframe}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-foreground">
+                      {d.row_count.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-foreground-muted">
+                      {d.start_date} &rarr; {d.end_date}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <TablePagination
             onPageChange={setPage}
@@ -186,8 +276,8 @@ export default function DatasetsPage() {
             pageSize={pageSize}
             total={filtered.length}
           />
-        </div>
+        </Card>
       ) : null}
-    </div>
+    </>
   );
 }

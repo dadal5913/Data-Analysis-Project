@@ -30,10 +30,20 @@ describe("ML page validation", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<MlPage />);
-    await waitFor(() => expect(screen.getByText("Train Model")).toBeTruthy());
+    // Wait for datasets to load so the submit button becomes enabled.
+    await waitFor(
+      () => {
+        const button = screen.getByRole("button", { name: /Train Model/i });
+        expect(button).not.toBeDisabled();
+      },
+      { timeout: 3000 }
+    );
+    const trainButton = screen.getByRole("button", { name: /Train Model/i });
     const input = screen.getByDisplayValue("0.2");
     fireEvent.change(input, { target: { value: "0.9" } });
-    fireEvent.click(screen.getByText("Train Model"));
-    expect(screen.getByText("Test size must be between 0.1 and 0.5")).toBeTruthy();
+    fireEvent.click(trainButton);
+    await waitFor(() =>
+      expect(screen.getByText("Test size must be between 0.1 and 0.5")).toBeTruthy()
+    );
   });
 });
