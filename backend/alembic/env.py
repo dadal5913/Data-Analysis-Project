@@ -1,6 +1,7 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from app.core.config import get_settings
 from app.models.backtest import BacktestResult
 from app.models.base import Base
 from app.models.dataset import Dataset
@@ -9,6 +10,11 @@ from app.models.user import User
 _ = (User, Dataset, BacktestResult)
 target_metadata = Base.metadata
 config = context.config
+
+# Prefer DATABASE_URL from the app settings (pydantic-settings) over alembic.ini.
+# ConfigParser treats "%" specially; escape any percent signs in passwords, etc.
+_settings = get_settings()
+config.set_main_option("sqlalchemy.url", _settings.database_url.replace("%", "%%"))
 
 
 def run_migrations_offline():

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     database_url: str = "postgresql+psycopg2://quantlab:quantlab@postgres:5432/quantlab"
+    # Comma-separated list, e.g. "https://app.example.com,http://localhost:3000"
+    cors_origins: str = "http://localhost:3000"
     secret_key: str = "change-this-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

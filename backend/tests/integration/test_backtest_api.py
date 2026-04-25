@@ -1,10 +1,4 @@
-import os
-from pathlib import Path
-
 from fastapi.testclient import TestClient
-
-os.environ["DATABASE_URL"] = "sqlite:///./test_quantlab.db"
-os.environ["UPLOAD_DIR"] = str(Path.cwd() / "test_uploads")
 
 from app.main import app
 

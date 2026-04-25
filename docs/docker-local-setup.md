@@ -63,7 +63,8 @@ REDIS_PORT=6379
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
 
-# --- Auth / API ---
+# --- Auth / API / CORS ---
+CORS_ORIGINS=http://localhost:3000
 SECRET_KEY=change-this-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 ALGORITHM=HS256
@@ -117,10 +118,9 @@ What the script does, in order:
 3. `docker compose ... up -d --build` to build and start the three services.
 4. Waits for the backend container to accept `exec` calls.
 5. Polls `http://localhost:8000/health` until the API is reachable.
-6. Runs `Base.metadata.create_all` inside the backend container to ensure tables exist on Neon (idempotent).
-7. Attempts `alembic upgrade head` (non-fatal if no revisions are present yet).
-8. Seeds the demo user (`python -m app.db.seed`).
-9. Prints the URLs and demo credentials.
+6. Runs `alembic upgrade head` inside the backend container to apply migrations on Neon (required before seed).
+7. Seeds the demo user (`python -m app.db.seed`).
+8. Prints the URLs and demo credentials.
 
 ### 4.2 Make targets
 
@@ -147,15 +147,11 @@ You can then perform the equivalent of the helper script manually:
 # 1) Tail backend logs and wait until "Uvicorn running on ..." appears
 docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f backend
 
-# 2) Create tables on Neon (safe to re-run)
-docker compose --env-file infra/.env -f infra/docker-compose.yml `
-  exec backend python -c "from app.models.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
-
-# 3) Apply migrations (once revisions exist under backend/alembic/versions/)
+# 2) Apply migrations (schema is managed by Alembic; use a fresh Neon branch or empty DB for first run)
 docker compose --env-file infra/.env -f infra/docker-compose.yml `
   exec backend sh -lc "PYTHONPATH=/app alembic upgrade head"
 
-# 4) Seed demo user
+# 3) Seed demo user
 docker compose --env-file infra/.env -f infra/docker-compose.yml `
   exec backend python -m app.db.seed
 ```
@@ -267,7 +263,7 @@ If you want a clean database, either:
 - Create a new **Neon branch** from the dashboard and point `DATABASE_URL` at it, **or**
 - Connect to Neon with `psql` and run `DROP TABLE ...` / `TRUNCATE ...` manually.
 
-Then re-run the `create_all` + seed steps from section 4.
+Then re-run the migration + seed steps from section 4 (`alembic upgrade head`, then `python -m app.db.seed`).
 
 ---
 
@@ -357,11 +353,13 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml `
 
 ### 8.6 `relation "users" does not exist` during seed
 
-Tables were not created yet on Neon. Make sure the backend came up healthy at least once, or run the `create_all` command from section 4.3 step 2.
+Migrations were not applied on Neon. Run `alembic upgrade head` from section 4.3 step 2 (or `make migrate`), then seed again.
 
 ### 8.7 Frontend loads but API calls fail with CORS / network errors
 
 Check that `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_WS_URL` in the env file match the **host** ports you mapped. The Next.js app runs in your browser, so it reaches the backend via `localhost:<BACKEND_PORT>`, not via the Docker service name `backend`.
+
+Also ensure `CORS_ORIGINS` includes your frontend origin exactly (scheme + host + port), e.g. `http://localhost:3000`. The API no longer uses `Access-Control-Allow-Origin: *` with credentials.
 
 ### 8.8 Neon auto-suspend tail-latency on the first request
 
@@ -377,7 +375,7 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml build --no-cach
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
 ```
 
-Then re-run `create_all` and the seed step. If you also want to wipe Neon data, see section 7.3.
+Then re-run `alembic upgrade head` and the seed step. If you also want to wipe Neon data, see section 7.3.
 
 ---
 

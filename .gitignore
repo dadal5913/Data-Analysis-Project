@@ -19,6 +19,7 @@ coverage/
 backend/uploads/
 backend/.pytest_cache/
 frontend/.turbo/
+frontend/tsconfig.tsbuildinfo
 
 .idea/
 .vscode/

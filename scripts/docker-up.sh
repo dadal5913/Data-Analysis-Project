@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# QuantLab — build and start the Docker stack, ensure DB schema (Neon),
-# run Alembic (if revisions exist), and seed the demo user.
+# QuantLab — build and start the Docker stack, run Alembic on Neon, seed the demo user.
 #
 # Run from anywhere:
 #   bash scripts/docker-up.sh
@@ -61,18 +60,8 @@ for _ in {1..45}; do
   sleep 2
 done
 
-echo "==> Ensuring database tables on Neon (SQLAlchemy create_all, idempotent)..."
-"${COMPOSE[@]}" exec -T backend python -c \
-  "from app.models.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
-
-echo "==> Alembic upgrade head (OK to skip if versions/ is empty)..."
-set +e
+echo "==> Alembic upgrade head (applies migrations on Neon)..."
 "${COMPOSE[@]}" exec -T backend sh -lc "PYTHONPATH=/app alembic upgrade head"
-ALEMBIC_EXIT=$?
-set -e
-if [[ $ALEMBIC_EXIT -ne 0 ]]; then
-  echo "Note: Alembic exit $ALEMBIC_EXIT — often expected before the first revision is committed in backend/alembic/versions/."
-fi
 
 echo "==> Seeding demo user..."
 "${COMPOSE[@]}" exec -T backend python -m app.db.seed

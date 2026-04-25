@@ -48,7 +48,7 @@ See `docs/docker-local-setup.md` for the detailed walkthrough (including auto-su
 
 ### 1. Start the stack
 
-**One-shot (bash):** from repo root, run all startup steps (compose up, wait for API, `create_all` on Neon, Alembic, seed):
+**One-shot (bash):** from repo root, run all startup steps (compose up, wait for API, Alembic on Neon, seed):
 
 ```bash
 bash scripts/docker-up.sh
@@ -70,13 +70,11 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 
 ### 2. Database schema
 
-SQLAlchemy creates tables when the API process imports `app.main` (`Base.metadata.create_all`). **Start the backend once** and confirm it is healthy before seeding:
+Schema is managed with **Alembic**. `scripts/docker-up.sh` runs `alembic upgrade head` after the API is healthy. To apply migrations yourself:
 
 ```bash
 docker compose --env-file infra/.env -f infra/docker-compose.yml logs --tail=50 backend
 ```
-
-**Alembic:** Initial migration revisions may not be committed yet. The `make migrate` target sets `PYTHONPATH=/app` so Alembic can import the `app` package. After you add files under `backend/alembic/versions/`, run:
 
 ```bash
 make migrate
@@ -88,11 +86,7 @@ Or:
 docker compose --env-file infra/.env -f infra/docker-compose.yml exec backend sh -lc "PYTHONPATH=/app alembic upgrade head"
 ```
 
-If you need to create tables manually (e.g. before the API has started successfully):
-
-```bash
-docker compose --env-file infra/.env -f infra/docker-compose.yml exec backend python -c "from app.models.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
-```
+Set `CORS_ORIGINS` in `infra/.env` to match your frontend origin (e.g. `http://localhost:3000`). See [docs/docker-local-setup.md](docs/docker-local-setup.md).
 
 ### 3. Seed demo user
 
@@ -147,6 +141,10 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml build --no-cach
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
 ```
 
+## Deployment
+
+The intended workflow is **local**: Docker Compose (Redis + backend + frontend) and **Neon** for Postgres. See **[`docs/docker-local-setup.md`](docs/docker-local-setup.md)** for the full walkthrough. A short summary lives in **[`docs/deployment.md`](docs/deployment.md)**. CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (tests plus an optional `Dockerfile.prod` build check for the backend).
+
 ## Troubleshooting
 
 | Symptom | Likely cause | What to try |
@@ -155,7 +153,7 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
 | `could not translate host name` / `SSL connection has been closed` | Missing `sslmode=require` or wrong scheme | Confirm the URL starts with `postgresql+psycopg2://` and ends with `?sslmode=require`. |
 | `localhost:3000` is blank or refuses connection | Frontend container crashed | `docker compose ... logs frontend` — Next.js expects `frontend/next.config.mjs` (not `next.config.ts` in this Node image). |
 | `ModuleNotFoundError: No module named 'app'` when running Alembic | Python path inside container | Use `make migrate` or prefix with `PYTHONPATH=/app` (already wired in the Makefile). |
-| `relation "users" does not exist` when running seed | Tables not created yet on Neon | Start backend successfully or run the `create_all` one-liner in section 2. |
+| `relation "users" does not exist` when running seed | Migrations not applied on Neon | Run `make migrate` or `alembic upgrade head` in the backend container (see section 2). |
 | First API request after idle is slow (~1–3s) | Neon compute auto-suspend | Expected on free tier; `pool_pre_ping` handles stale connections transparently. |
 | `email-validator is not installed` | Missing optional Pydantic email dependency | Rebuild backend after pulling `email-validator` in `requirements.txt`. |
 | bcrypt / passlib errors during seed | `bcrypt` too new for `passlib` | `backend/requirements.txt` pins `bcrypt==4.0.1`; rebuild the backend image. |
@@ -215,4 +213,4 @@ Current UI now includes:
 7. Add Playwright E2E for auth + backtest run flow
 8. Add model registry and persisted ML model artifacts
 9. Add observability stack (OpenTelemetry + Prometheus/Grafana)
-10. Add deployment manifests for Fly.io/Render/Kubernetes
+10. Add Kubernetes or other remote deployment manifests (optional; local Docker is the default)

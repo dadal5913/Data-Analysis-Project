@@ -17,3 +17,7 @@ uploads
 .DS_Store
 .vscode
 .idea
+tests
+test_uploads
+test_quantlab.db
+*.db

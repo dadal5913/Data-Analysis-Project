@@ -11,7 +11,7 @@ The design chases the look and feel of modern analytics / quant tooling. The mai
 | Product | What we borrow |
 |---------|----------------|
 | **Linear** | Refined dark palette, dense typography, careful spacing, subtle gradients, snappy `animate-fade-in` entrances. |
-| **Vercel Dashboard** | Near-black canvas, translucent cards, soft radial glow, clean topbar with breadcrumbs. |
+| **SaaS control panels** | Near-black canvas, translucent cards, soft radial glow, clean topbar with breadcrumbs. |
 | **Supabase Studio** | Sidebar groups ("Workspace", "Resources"), active-item pill, icon + label nav, in-sidebar user card with logout. |
 | **Stripe Dashboard** | KPI cards with label + large tabular-nums value + delta chip; semantic success/danger colors. |
 | **TradingView / Grafana** | Monospace numerals for prices and metrics, clear positive/negative semantics on PnL, compact data tables. |
